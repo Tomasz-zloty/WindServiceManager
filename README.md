@@ -1,4 +1,4 @@
-Projekt zaliczeniowy — aplikacje .NET
+Projekt zaliczeniowy 
 
 # Wind Service Manager
 
