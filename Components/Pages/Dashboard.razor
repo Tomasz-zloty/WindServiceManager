@@ -1,0 +1,165 @@
+@page "/dashboard"
+@using Microsoft.EntityFrameworkCore
+@using WindServiceManager.Models
+@using WindServiceManager.Data
+@inject AppDbContext Db
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard - Turbiny</PageTitle>
+
+<div class="dashboard-header mb-4">
+    <div>
+        <h2 class="dashboard-title mb-1">Pulpit operacyjny farmy</h2>
+        <p class="text-muted mb-0">Monitoruj stan turbin </p>
+    </div>
+    <a href="turbines" class="btn btn-outline-primary btn-sm">+ Dodaj turbiny</a>
+</div>
+
+<div class="dashboard-filters mb-4">
+    <button type="button" class="dashboard-filter @(activeFilter == null ? "active" : "")" @onclick="() => SetFilter(null)">
+        Wszystkie <span class="badge rounded-pill">@turbines.Count</span>
+    </button>
+    <button type="button" class="dashboard-filter dashboard-filter-success @(activeFilter == TurbineStatus.Operational ? "active" : "")" @onclick="() => SetFilter(TurbineStatus.Operational)">
+        Sprawne <span class="badge rounded-pill">@operationalCount</span>
+    </button>
+    <button type="button" class="dashboard-filter dashboard-filter-danger @(activeFilter == TurbineStatus.Failure ? "active" : "")" @onclick="() => SetFilter(TurbineStatus.Failure)">
+        Awaria <span class="badge rounded-pill">@failureCount</span>
+    </button>
+    <button type="button" class="dashboard-filter dashboard-filter-warning @(activeFilter == TurbineStatus.Maintenance ? "active" : "")" @onclick="() => SetFilter(TurbineStatus.Maintenance)">
+        Serwis <span class="badge rounded-pill">@maintenanceCount</span>
+    </button>
+</div>
+
+@if (!filteredTurbines.Any())
+{
+    <div class="dashboard-empty text-center py-5">
+        <div class="dashboard-empty-icon mb-3">🌬️</div>
+        <h5 class="mb-2">Brak turbin do wyświetlenia</h5>
+        <p class="text-muted mb-3">
+            @(turbines.Count == 0
+                ? "Dodaj turbiny w zakładce Turbiny, aby rozpocząć monitoring farmy."
+                : "Żadna turbina nie pasuje do wybranego filtra.")
+        </p>
+        @if (turbines.Count == 0)
+        {
+            <a href="turbines" class="btn btn-primary">Przejdź do zarządzania turbinami</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => SetFilter(null)">Pokaż wszystkie</button>
+        }
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var turbine in filteredTurbines)
+        {
+            var accentClass = turbine.Status == TurbineStatus.Operational ? "accent-operational" :
+                              turbine.Status == TurbineStatus.Failure ? "accent-failure" : "accent-maintenance";
+            var statusClass = turbine.Status == TurbineStatus.Operational ? "status-dot-operational" :
+                              turbine.Status == TurbineStatus.Failure ? "status-dot-failure" : "status-dot-maintenance";
+            var statusLabel = GetStatusLabel(turbine.Status);
+            var openTickets = turbine.ServiceTickets.Count(t => !t.IsClosed);
+
+            <div class="col-md-6 col-xl-4">
+                <article class="dashboard-turbine-card @accentClass">
+                    <div class="dashboard-turbine-top">
+                        <div>
+                            <h5 class="dashboard-turbine-name mb-1">@turbine.Name</h5>
+                            <span class="status-indicator @statusClass">
+                                <span class="status-dot"></span>
+                                @statusLabel
+                            </span>
+                        </div>
+                        @if (openTickets > 0)
+                        {
+                            <span class="dashboard-ticket-badge" title="Otwarte zgłoszenia">@openTickets zgł.</span>
+                        }
+                    </div>
+
+                    <div class="dashboard-turbine-meta">
+                        <div class="dashboard-meta-row">
+                            <span class="dashboard-meta-label">Lokalizacja</span>
+                            <span>@(string.IsNullOrWhiteSpace(turbine.Location) ? "—" : turbine.Location)</span>
+                        </div>
+                        <div class="dashboard-meta-row">
+                            <span class="dashboard-meta-label">Model</span>
+                            <span>@(string.IsNullOrWhiteSpace(turbine.Model) ? "—" : turbine.Model)</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-status-switch" role="group" aria-label="Zmiana statusu turbiny @turbine.Name">
+                        <button type="button"
+                                class="dashboard-status-btn @(turbine.Status == TurbineStatus.Operational ? "is-active is-active-success" : "")"
+                                @onclick="() => ChangeStatus(turbine, TurbineStatus.Operational)">
+                            Działa
+                        </button>
+                        <button type="button"
+                                class="dashboard-status-btn @(turbine.Status == TurbineStatus.Maintenance ? "is-active is-active-warning" : "")"
+                                @onclick="() => ChangeStatus(turbine, TurbineStatus.Maintenance)">
+                            Serwis
+                        </button>
+                        <button type="button"
+                                class="dashboard-status-btn @(turbine.Status == TurbineStatus.Failure ? "is-active is-active-danger" : "")"
+                                @onclick="() => ChangeStatus(turbine, TurbineStatus.Failure)">
+                            Awaria
+                        </button>
+                    </div>
+                </article>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<WindTurbine> turbines = new();
+    private TurbineStatus? activeFilter;
+
+    private int operationalCount => turbines.Count(t => t.Status == TurbineStatus.Operational);
+    private int failureCount => turbines.Count(t => t.Status == TurbineStatus.Failure);
+    private int maintenanceCount => turbines.Count(t => t.Status == TurbineStatus.Maintenance);
+
+    private IEnumerable<WindTurbine> filteredTurbines =>
+        activeFilter is null
+            ? turbines
+            : turbines.Where(t => t.Status == activeFilter);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        turbines = await Db.WindTurbines
+            .Include(t => t.ServiceTickets)
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+    }
+
+    private void SetFilter(TurbineStatus? status)
+    {
+        activeFilter = status;
+    }
+
+    private async Task ChangeStatus(WindTurbine turbine, TurbineStatus newStatus)
+    {
+        if (turbine.Status == newStatus)
+        {
+            return;
+        }
+
+        turbine.Status = newStatus;
+        await Db.SaveChangesAsync();
+        await LoadData();
+    }
+
+    private static string GetStatusLabel(TurbineStatus status) => status switch
+    {
+        TurbineStatus.Operational => "Sprawna",
+        TurbineStatus.Failure => "Awaria",
+        TurbineStatus.Maintenance => "Serwis",
+        _ => status.ToString()
+    };
+}

@@ -1,0 +1,89 @@
+@page "/turbines"
+@rendermode InteractiveServer
+
+<PageTitle>Turbiny - Wind Service Manager</PageTitle>
+
+<h3 class="mb-4">Zarządzanie turbinami</h3>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3">Dodaj turbiny do farmy</h5>
+                <EditForm Model="form" OnValidSubmit="AddTurbines">
+                    <div class="mb-3">
+                        <label class="form-label">Prefiks nazwy</label>
+                        <InputText @bind-Value="form.Prefix" class="form-control" placeholder="np. WTG" />
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Numer początkowy</label>
+                            <InputNumber @bind-Value="form.StartNumber" class="form-control" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Ilość turbin</label>
+                            <InputNumber @bind-Value="form.Count" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Lokalizacja</label>
+                        <InputText @bind-Value="form.Location" class="form-control" placeholder="np. Farma Grajewo" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Model</label>
+                        <InputText @bind-Value="form.Model" class="form-control" placeholder="np. Vestas V90" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(formMessage))
+                    {
+                        <div class="alert alert-info py-2 small">@formMessage</div>
+                    }
+                    <button type="submit" class="btn btn-primary w-100">Dodaj turbiny</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Lista turbin (@turbines.Count)</span>
+            </div>
+            <div class="card-body p-0">
+                @if (turbines.Count == 0)
+                {
+                    <p class="text-muted p-4 mb-0">Brak turbin w bazie. Dodaj pierwszą partię za pomocą formularza.</p>
+                }
+                else
+                {
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nazwa</th>
+                                <th>Lokalizacja</th>
+                                <th>Model</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var turbine in turbines)
+                            {
+                                <tr>
+                                    <td><strong>@turbine.Name</strong></td>
+                                    <td>@turbine.Location</td>
+                                    <td>@turbine.Model</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadge(turbine.Status)">@GetStatusLabel(turbine.Status)</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTurbine(turbine)">Usuń</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,168 @@
+﻿@page "/"
+@using Microsoft.EntityFrameworkCore
+@using WindServiceManager.Data
+@using WindServiceManager.Models
+@inject AppDbContext Db
+
+<PageTitle>Wind Service Manager</PageTitle>
+
+<div class="home-hero mb-4">
+    <h1 class="display-5 fw-semibold mb-2">System Zarządzania Farmą Wiatrową Grajewo</h1>
+    <p class="lead text-muted mb-0"> Platforma O&amp;M do monitorowania turbin i zgłoszeń serwisowych</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card summary-card h-100 bg-white border-0 shadow-sm border-start border-4 border-secondary">
+            <div class="card-body">
+                <div class="summary-label text-muted">Łączna liczba turbin</div>
+                <div class="summary-value text-secondary">@totalTurbines</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card summary-card h-100 bg-white border-0 shadow-sm border-start border-4 border-success">
+            <div class="card-body">
+                <div class="summary-label text-muted">Turbiny sprawne</div>
+                <div class="summary-value text-success">@operationalCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card summary-card h-100 bg-white border-0 shadow-sm border-start border-4 border-danger">
+            <div class="card-body">
+                <div class="summary-label text-muted">Turbiny z awarią</div>
+                <div class="summary-value text-danger">@failureCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card summary-card h-100 bg-white border-0 shadow-sm border-start border-4 border-primary">
+            <div class="card-body">
+                <div class="summary-label text-muted">Aktywne zgłoszenia</div>
+                <div class="summary-value text-primary">@openTicketsCount</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="mb-5">
+    <h4 class="mb-3 fw-semibold">Aktywny Serwis na Farmie</h4>
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Stan turbin i otwarte zgłoszenia</div>
+                <div class="card-body">
+                    @if (turbines.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Brak turbin w bazie danych.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush turbine-status-list">
+                            @foreach (var turbine in turbines)
+                            {
+                                var openTickets = turbine.ServiceTickets.Where(t => !t.IsClosed).ToList();
+
+                                <li class="list-group-item px-0">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong>@turbine.Name</strong>
+                                        <span class="badge @GetStatusBadgeClass(turbine.Status)">@GetStatusLabel(turbine.Status)</span>
+                                    </div>
+                                    @if (openTickets.Count == 0)
+                                    {
+                                        <p class="text-muted small mb-0">Brak aktywnych usterkek</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="small mb-0 ps-3 text-secondary">
+                                            @foreach (var ticket in openTickets)
+                                            {
+                                                <li>@ticket.Description</li>
+                                            }
+                                        </ul>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Gdzie aktualnie pracują zespoły?</div>
+                <div class="card-body">
+                    @if (!maintenanceTurbines.Any())
+                    {
+                        <p class="text-muted mb-0">Wszystkie zespoły w bazie / brak prac na wysokości</p>
+                    }
+                    else
+                    {
+                        @foreach (var turbine in maintenanceTurbines)
+                        {
+                            <div class="alert alert-warning maintenance-alert mb-3" role="alert">
+                                <strong>⚠️ UWAGA:</strong> Zespół serwisowy pracuje na turbinie <strong>@turbine.Name</strong> &mdash; Blokada LOTO aktywna!
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="bhp-footer alert alert-light border shadow-sm" role="contentinfo">
+    <h6 class="alert-heading mb-2 text-muted">
+        <span class="bi-shield-check me-2"></span>Zasady BHP i procedury GWO na farmie
+    </h6>
+    <ul class="mb-0 ps-3 small text-muted">
+        <li>Przed wejściem na turbinę zawsze zgłoś pracę w systemie LOTO i potwierdź izolację energii.</li>
+        <li>Obowiązkowe środki ochrony indywidualnej: kask, uprząż, rękawice dielektryczne, obuwie antypoślizgowe.</li>
+        <li>Prace na wysokości prowadź wyłącznie po sprawdzeniu certyfikatu GWO BST i aktualnego badania lekarskiego.</li>
+        <li>W przypadku wiatru powyżej 12 m/s lub burzy przerwij prace i opuść stanowisko zgodnie z procedurą ewakuacji.</li>
+        <li>Każdy incydent lub uszkodzenie raportuj natychmiast w module Zgłoszenia.</li>
+    </ul>
+</footer>
+
+@code {
+    private List<WindTurbine> turbines = new();
+    private int totalTurbines;
+    private int operationalCount;
+    private int failureCount;
+    private int openTicketsCount;
+
+    private IEnumerable<WindTurbine> maintenanceTurbines =>
+        turbines.Where(t => t.Status == TurbineStatus.Maintenance);
+
+    protected override async Task OnInitializedAsync()
+    {
+        turbines = await Db.WindTurbines
+            .Include(t => t.ServiceTickets)
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+
+        totalTurbines = turbines.Count;
+        operationalCount = turbines.Count(t => t.Status == TurbineStatus.Operational);
+        failureCount = turbines.Count(t => t.Status == TurbineStatus.Failure);
+        openTicketsCount = turbines
+            .SelectMany(t => t.ServiceTickets)
+            .Count(t => !t.IsClosed);
+    }
+
+    private static string GetStatusLabel(TurbineStatus status) => status switch
+    {
+        TurbineStatus.Operational => "Sprawna",
+        TurbineStatus.Failure => "Awaria",
+        TurbineStatus.Maintenance => "Serwis",
+        _ => status.ToString()
+    };
+
+    private static string GetStatusBadgeClass(TurbineStatus status) => status switch
+    {
+        TurbineStatus.Operational => "text-bg-success",
+        TurbineStatus.Failure => "text-bg-danger",
+        TurbineStatus.Maintenance => "text-bg-warning text-dark",
+        _ => "text-bg-secondary"
+    };
+}

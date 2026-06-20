@@ -1,0 +1,127 @@
+@page "/tickets"
+@using Microsoft.EntityFrameworkCore
+@using WindServiceManager.Models
+@using WindServiceManager.Data
+@inject AppDbContext Db
+@rendermode InteractiveServer
+
+<PageTitle>Zgłoszenia Serwisowe</PageTitle>
+
+<h3 class="mb-4">Zgłoszenia Serwisowe / Awaryjne</h3>
+
+<table class="table table-striped table-hover align-middle shadow-sm rounded">
+    <thead class="table-dark">
+        <tr>
+            <th>Turbina</th>
+            <th>Opis problemu</th>
+            <th>Data zgłoszenia</th>
+            <th>Priorytet</th>
+            <th>Status</th>
+            <th>Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var ticket in tickets)
+        {
+            <tr>
+                <td><strong>@ticket.WindTurbine?.Name</strong></td>
+                <td>@ticket.Description</td>
+                <td>@ticket.CreatedAt.ToString("g")</td>
+                <td>
+                    <span class="badge @(ticket.Priority == TicketPriority.High ? "bg-danger" : ticket.Priority == TicketPriority.Medium ? "bg-warning text-dark" : "bg-info text-dark")">
+                        @ticket.Priority
+                    </span>
+                </td>
+                <td>
+                    <span class="badge @(ticket.IsClosed ? "bg-secondary" : "bg-primary")">
+                        @(ticket.IsClosed ? "Zamknięte" : "Otwarte")
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        @if (!ticket.IsClosed)
+                        {
+                            <button class="btn btn-success" @onclick="() => CloseTicket(ticket)">Zamknij</button>
+                        }
+                        <button class="btn btn-danger" @onclick="() => DeleteTicket(ticket)">Usuń</button>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<hr class="my-5" />
+
+<div class="card p-4 shadow-sm" style="max-width: 600px;">
+    <h4 class="card-title mb-3">Zgłoś nową awarię / przegląd</h4>
+    <EditForm Model="newTicket" OnValidSubmit="AddTicket">
+        <div class="mb-3">
+            <label class="form-label">Wybierz turbinę:</label>
+            <InputSelect @bind-Value="newTicket.WindTurbineId" class="form-select">
+                <option value="0">-- Wybierz WTG --</option>
+                @foreach (var t in turbines)
+                {
+                    <option value="@t.Id">@t.Name (@t.Location)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Opis usterki / zadania:</label>
+            <InputText @bind-Value="newTicket.Description" class="form-control" placeholder="np. Wyciek oleju, błąd komunikacji..." />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Priorytet:</label>
+            <InputSelect @bind-Value="newTicket.Priority" class="form-select">
+                @foreach (var priority in Enum.GetValues<TicketPriority>())
+                {
+                    <option value="@priority">@priority</option>
+                }
+            </InputSelect>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Dodaj zgłoszenie do bazy</button>
+    </EditForm>
+</div>
+
+@code {
+    private List<ServiceTicket> tickets = new();
+    private List<WindTurbine> turbines = new();
+    private ServiceTicket newTicket = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        tickets = await Db.ServiceTickets.Include(t => t.WindTurbine).ToListAsync();
+        turbines = await Db.WindTurbines.ToListAsync();
+    }
+
+    private async Task AddTicket()
+    {
+        if (newTicket.WindTurbineId == 0) return;
+
+        newTicket.CreatedAt = DateTime.Now;
+        Db.ServiceTickets.Add(newTicket);
+        await Db.SaveChangesAsync();
+        
+        newTicket = new ServiceTicket();
+        await LoadData();
+    }
+
+    private async Task CloseTicket(ServiceTicket ticket)
+    {
+        ticket.IsClosed = true;
+        await Db.SaveChangesAsync();
+        await LoadData();
+    }
+
+    private async Task DeleteTicket(ServiceTicket ticket)
+    {
+        Db.ServiceTickets.Remove(ticket);
+        await Db.SaveChangesAsync();
+        await LoadData();
+    }
+}

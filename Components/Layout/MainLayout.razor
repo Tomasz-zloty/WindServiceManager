@@ -1,0 +1,23 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar bg-dark-industrial">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <span class="top-row-title text-muted">Operacje i konserwacja</span>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Wystąpił nieobsłużony błąd.
+    <a href="." class="reload">Odśwież</a>
+    <span class="dismiss">🗙</span>
+</div>

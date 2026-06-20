@@ -1,0 +1,25 @@
+## Build
+bin/
+obj/
+publish/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+## Baza danych lokalna
+*.db
+*.db-shm
+*.db-wal
+
+## Cursor / narzędzia AI (nie commituj)
+.cursor/
+.agent/
+*.cursorrules
+
+## System
+Thumbs.db
+Desktop.ini
